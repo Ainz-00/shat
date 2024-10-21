@@ -12,11 +12,15 @@ class TextEditor:
         self.root.title("Note--MAT")
         self.root.geometry("800x600")
 
-        # تحويل النافذة لدعم DnD
-        self.text_area = tk.Text(self.root, wrap='word', undo=True, font=('Helvetica', 14))
-        self.text_area.pack(expand=1, fill='both', padx=10, pady=10)
-        
+       # إعداد واجهة النص
+        self.text_area = tk.Text(self.root, wrap="word", undo=True)
+        self.text_area.pack(expand=True, fill="both")
+
+        # إعداد الـ Highlighter مع لغة Python افتراضيًا
         self.highlighter = SyntaxHighlighter(self.text_area, language="python")
+
+        # تفعيل التلوين عند فتح النص مباشرة
+        self.root.after(100, self.highlighter.highlight)
         self.text_area.bind("<KeyRelease>", self.highlighter.highlight)
         
         # تعريف متغير الحالة
@@ -87,8 +91,9 @@ class TextEditor:
 
 
         # دعم السحب والإفلات
-        self.text_area.drop_target_register(DND_FILES)
-        self.text_area.dnd_bind('<<Drop>>', self.on_file_drop)
+        self.root.drop_target_register(DND_FILES)
+        self.root.dnd_bind('<<Drop>>', self.on_file_drop)
+
         
         # ضبط البروتوكول لإغلاق التطبيق
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
@@ -164,10 +169,30 @@ class TextEditor:
     def open_file(self):
         self.file_path = filedialog.askopenfilename(filetypes=[("All Files", "*.*")])
         if self.file_path:
-            with open(self.file_path, 'r', encoding='utf-8') as file:
+            self.read_and_highlight_file(self.file_path)
+
+    def on_file_drop(self, event):
+        files = self.root.tk.splitlist(event.data)  # دعم سحب عدة ملفات
+        valid_extensions = ['.txt', '.py', '.cpp', '.java', '.html', '.json', '.xml']  # التنسيقات المدعومة
+        for file_path in files:
+            if os.path.isfile(file_path) and any(file_path.lower().endswith(ext) for ext in valid_extensions):
+                self.read_and_highlight_file(file_path)
+
+    def read_and_highlight_file(self, file_path):
+        try:
+            with open(file_path, 'r', encoding='utf-8') as file:
                 content = file.read()
                 self.text_area.delete(1.0, tk.END)
                 self.text_area.insert(tk.END, content)
+                self.highlighter.highlight()  # إضافة التلوين بعد فتح الملف
+        except FileNotFoundError:
+            messagebox.showerror("Error", "File not found. Please try again.")
+        except IsADirectoryError:
+            messagebox.showerror("Error", "Selected path is a directory, not a file.")
+        except Exception as e:
+            messagebox.showerror("Error", f"Unable to read file: {str(e)}")
+
+
 
     def save_file(self):
         if self.file_path:
@@ -398,16 +423,6 @@ class TextEditor:
             messagebox.showinfo("Not Found", f"'{search_text}' not found.")
             
             
-
-
-    def on_file_drop(self, event):
-        files = self.root.tk.splitlist(event.data)  # دعم سحب عدة ملفات
-        for file_path in files:
-            if os.path.isfile(file_path):
-                with open(file_path, 'r', encoding='utf-8') as file:
-                    content = file.read()
-                    self.text_area.insert(tk.END, f"\n\n--- {file_path} ---\n{content}")
-                self.file_path = file_path
 
 
     def undo(self):
